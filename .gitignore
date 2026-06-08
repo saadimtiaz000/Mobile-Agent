@@ -1,0 +1,11 @@
+.DS_Store
+.idea/
+.gradle/
+build/
+local.properties
+*.iml
+node_modules/
+dist/
+.env
+NoraAgent-mobile-debug.apk
+nora-*.png
