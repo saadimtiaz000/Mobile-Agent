@@ -252,7 +252,7 @@ class NoraRealtimeClient(
                         "instructions",
                         "Speak a concise answer using the latest function_call_output from $name. " +
                             "Do not call another tool for this same request. " +
-                            "For news, read the spokenBrief or the top headlines naturally. " +
+                            "For weather or news, read the spokenBrief first when present. " +
                             "If the tool output contains an error, apologize briefly and ask the user to try again.",
                     ),
             )

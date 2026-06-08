@@ -159,8 +159,8 @@ export class RealtimeService {
         "Only respond to clear user speech directed at Nora. Ignore background chatter, music, TV audio, keyboard taps, traffic, and accidental noise. " +
         "If the user audio is unclear or you are not confident what was asked, say briefly that you did not catch it and ask them to repeat. " +
         "Use live tools for current weather, forecasts, latest headlines, breaking news, and topic news. " +
-        "For weather, ask for the city if the user has not provided a location. " +
-        "For live updates, answer briefly with the freshest details and mention the source. " +
+        "For weather, ask for the city if the user has not provided a location or if a tool result says status needs_location. " +
+        "For live updates, answer briefly with the freshest details and mention the source. Prefer the tool result's spokenBrief when present. " +
         "Never claim you can bypass Android lock-screen security.",
       audio: {
         input: {

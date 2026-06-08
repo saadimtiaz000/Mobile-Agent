@@ -50,6 +50,32 @@ type WeatherForecastResponse = {
   };
 };
 
+type WttrWeatherResponse = {
+  current_condition?: Array<{
+    FeelsLikeC?: string;
+    humidity?: string;
+    localObsDateTime?: string;
+    precipMM?: string;
+    temp_C?: string;
+    weatherDesc?: Array<{ value?: string }>;
+    windspeedKmph?: string;
+  }>;
+  nearest_area?: Array<{
+    areaName?: Array<{ value?: string }>;
+    country?: Array<{ value?: string }>;
+    region?: Array<{ value?: string }>;
+  }>;
+  weather?: Array<{
+    date?: string;
+    hourly?: Array<{
+      chanceofrain?: string;
+      weatherDesc?: Array<{ value?: string }>;
+    }>;
+    maxtempC?: string;
+    mintempC?: string;
+  }>;
+};
+
 type NewsHeadline = {
   title: string;
   source?: string;
@@ -68,10 +94,9 @@ export const NORA_REALTIME_TOOLS: RealtimeToolDefinition[] = [
         location: {
           type: "string",
           description:
-            "City, region, and country if known, for example 'New York, US' or 'Karachi, Pakistan'. Ask the user for a city if it is missing.",
+            "City, region, and country if known, for example 'New York, US' or 'Karachi, Pakistan'. Leave empty if the user did not provide a place.",
         },
       },
-      required: ["location"],
       additionalProperties: false,
     },
   },
@@ -116,14 +141,45 @@ export class NoraToolsService {
 
   private async getCurrentWeather(args: JsonRecord) {
     const location = this.readString(args, "location");
-    if (!location) {
-      throw new BadRequestException("A location is required for weather.");
+    if (!location || this.isVagueWeatherLocation(location)) {
+      return this.weatherNeedsLocation(location);
     }
 
+    const openMeteoWeather = await this.tryOpenMeteoWeather(location);
+    if (openMeteoWeather) {
+      return openMeteoWeather;
+    }
+
+    const wttrWeather = await this.tryWttrWeather(location);
+    if (wttrWeather) {
+      return wttrWeather;
+    }
+
+    return {
+      type: "weather",
+      status: "unavailable",
+      source: "Open-Meteo and wttr.in",
+      fetchedAt: new Date().toISOString(),
+      requestedLocation: location,
+      spokenBrief:
+        `I could not reach live weather for ${location} right now. ` +
+        "Please try again in a moment, or give me another city.",
+    };
+  }
+
+  private async tryOpenMeteoWeather(location: string) {
+    try {
+      return await this.getOpenMeteoWeather(location);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async getOpenMeteoWeather(location: string) {
     const match = await this.findWeatherLocation(location);
 
     if (!match?.name || match.latitude === undefined || match.longitude === undefined) {
-      throw new BadRequestException(`No weather location found for "${location}".`);
+      return this.weatherNeedsLocation(location);
     }
 
     const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
@@ -145,9 +201,16 @@ export class NoraToolsService {
     );
     const current = forecast.current ?? {};
     const daily = forecast.daily ?? {};
+    const place = [match.name, match.admin1, match.country].filter(Boolean).join(", ");
+    const temperature = this.readNumber(current.temperature_2m);
+    const feelsLike = this.readNumber(current.apparent_temperature);
+    const humidity = this.readNumber(current.relative_humidity_2m);
+    const windKph = this.readNumber(current.wind_speed_10m);
+    const condition = this.weatherDescription(current.weather_code) ?? "current conditions";
 
     return {
       type: "weather",
+      status: "ok",
       source: "Open-Meteo",
       fetchedAt: new Date().toISOString(),
       location: {
@@ -167,6 +230,10 @@ export class NoraToolsService {
         precipitationMm: current.precipitation,
         windKph: current.wind_speed_10m,
       },
+      spokenBrief:
+        `Live weather for ${place}: ${temperature ?? "unknown"} degrees Celsius, ` +
+        `${condition}. Feels like ${feelsLike ?? "unknown"} degrees. ` +
+        `Humidity is ${humidity ?? "unknown"} percent, wind ${windKph ?? "unknown"} kilometers per hour.`,
       forecast: (daily.time ?? []).slice(0, 3).map((date, index) => ({
         date,
         condition: this.weatherDescription(daily.weather_code?.[index]),
@@ -175,6 +242,84 @@ export class NoraToolsService {
         precipitationChancePercent:
           daily.precipitation_probability_max?.[index],
       })),
+    };
+  }
+
+  private async tryWttrWeather(location: string) {
+    try {
+      return await this.getWttrWeather(location);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async getWttrWeather(location: string) {
+    const weatherUrl = new URL(
+      `https://wttr.in/${encodeURIComponent(location)}`,
+    );
+    weatherUrl.searchParams.set("format", "j1");
+
+    const weather = await this.fetchJson<WttrWeatherResponse>(
+      weatherUrl.toString(),
+    );
+    const current = weather.current_condition?.[0];
+    if (!current) {
+      return undefined;
+    }
+
+    const nearestArea = weather.nearest_area?.[0];
+    const name = nearestArea?.areaName?.[0]?.value ?? location;
+    const region = nearestArea?.region?.[0]?.value;
+    const country = nearestArea?.country?.[0]?.value;
+    const place = [name, region, country].filter(Boolean).join(", ");
+    const condition = current.weatherDesc?.[0]?.value;
+    const temperature = this.readNumber(current.temp_C);
+    const feelsLike = this.readNumber(current.FeelsLikeC);
+    const humidity = this.readNumber(current.humidity);
+    const windKph = this.readNumber(current.windspeedKmph);
+
+    return {
+      type: "weather",
+      status: "ok",
+      source: "wttr.in",
+      fetchedAt: new Date().toISOString(),
+      location: {
+        name,
+        region,
+        country,
+      },
+      current: {
+        time: current.localObsDateTime,
+        temperatureC: temperature,
+        feelsLikeC: feelsLike,
+        condition,
+        humidityPercent: humidity,
+        precipitationMm: this.readNumber(current.precipMM),
+        windKph,
+      },
+      spokenBrief:
+        `Live weather for ${place}: ${temperature ?? "unknown"} degrees Celsius, ` +
+        `${condition ?? "current conditions"}. Feels like ${feelsLike ?? "unknown"} degrees. ` +
+        `Humidity is ${humidity ?? "unknown"} percent, wind ${windKph ?? "unknown"} kilometers per hour.`,
+      forecast: (weather.weather ?? []).slice(0, 3).map((day) => ({
+        date: day.date,
+        condition: day.hourly?.[4]?.weatherDesc?.[0]?.value,
+        highC: this.readNumber(day.maxtempC),
+        lowC: this.readNumber(day.mintempC),
+        precipitationChancePercent: this.readNumber(day.hourly?.[4]?.chanceofrain),
+      })),
+    };
+  }
+
+  private weatherNeedsLocation(location?: string) {
+    return {
+      type: "weather",
+      status: "needs_location",
+      source: "Nora",
+      fetchedAt: new Date().toISOString(),
+      requestedLocation: location,
+      spokenBrief:
+        "Which city should I check for weather? I do not have your phone location yet, so please say a city or city and country.",
     };
   }
 
@@ -396,6 +541,29 @@ export class NoraToolsService {
     return typeof value === "string" && value.trim()
       ? value.trim()
       : undefined;
+  }
+
+  private isVagueWeatherLocation(location: string): boolean {
+    const normalized = location.toLowerCase().replace(/[^a-z\s]/g, " ").trim();
+    const vagueLocations = new Set([
+      "here",
+      "near me",
+      "my location",
+      "current location",
+      "around me",
+      "where i am",
+      "my area",
+      "this area",
+      "local",
+      "local weather",
+    ]);
+
+    return vagueLocations.has(normalized);
+  }
+
+  private readNumber(value: unknown): number | undefined {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   private normalizeRegion(region: string): string {
