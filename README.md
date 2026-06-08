@@ -6,12 +6,12 @@ Nora is a mobile voice-agent starter app for Android. The app uses Kotlin + Jetp
 
 ## Flow
 
-1. User connects earbuds.
+1. User uses earbuds/headset or the phone speaker.
 2. User opens Nora, or uses an earbud/media action while Nora's foreground service is active.
 3. If the phone is locked, Android shows the system unlock UI before the protected voice session starts.
 4. Nora starts a WebRTC voice-agent session.
 5. User speaks naturally.
-6. OpenAI Realtime responds with speech through the selected audio route.
+6. OpenAI Realtime responds with speech through earbuds when connected, otherwise through the phone speaker.
 
 ## Projects
 

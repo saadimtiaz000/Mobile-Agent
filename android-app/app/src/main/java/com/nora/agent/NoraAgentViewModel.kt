@@ -17,7 +17,7 @@ data class NoraAgentState(
     val isHearingUser: Boolean = false,
     val isResponding: Boolean = false,
     val statusText: String = "Ready when you say Nora.",
-    val lastEvent: String = "Connect earbuds, then start a voice session.",
+    val lastEvent: String = "Use earbuds or phone speaker, then start a voice session.",
 )
 
 class NoraAgentViewModel(application: Application) : AndroidViewModel(application) {
@@ -37,13 +37,13 @@ class NoraAgentViewModel(application: Application) : AndroidViewModel(applicatio
             it.copy(
                 isConnecting = true,
                 statusText = "Connecting Nora...",
-                lastEvent = "Preparing Bluetooth audio and WebRTC.",
+                lastEvent = "Preparing the best audio route and WebRTC.",
             )
         }
 
         viewModelScope.launch {
             runCatching {
-                audioRouteManager.preferBluetooth()
+                audioRouteManager.preferBestVoiceRoute()
                 realtimeClient.connect()
             }.onSuccess {
                 mutableState.update {
@@ -53,7 +53,7 @@ class NoraAgentViewModel(application: Application) : AndroidViewModel(applicatio
                         isHearingUser = false,
                         isResponding = false,
                         statusText = "Nora is listening.",
-                        lastEvent = "Speak naturally. Nora will reply in your earbuds when connected.",
+                        lastEvent = "Speak naturally. Nora will reply through earbuds or phone speaker.",
                     )
                 }
             }.onFailure { error ->

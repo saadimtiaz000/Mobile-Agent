@@ -4,7 +4,7 @@
 
 Nora is a speech-to-speech Android agent:
 
-1. The user connects earbuds.
+1. The user uses earbuds/headset or the phone speaker.
 2. The user starts Nora from the app UI, notification, or a media button path while the foreground service is active.
 3. If the phone is locked, Android presents system unlock UI.
 4. The app asks the backend to exchange a WebRTC SDP offer with OpenAI.
@@ -33,7 +33,7 @@ The Android app owns the user experience and audio device behavior.
 
 - Jetpack Compose UI for Nora's session state.
 - Foreground service for visible microphone work.
-- `AudioManager` route preference for Bluetooth earbuds/headsets.
+- `AudioManager` route preference for Bluetooth earbuds/headsets, with phone speaker fallback.
 - `MediaSession` hook for earbud/media actions.
 - `KeyguardManager` and `BiometricPrompt` helpers for protected actions.
 - WebRTC peer connection setup.

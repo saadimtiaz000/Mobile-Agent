@@ -15,28 +15,15 @@ class AudioRouteManager(private val context: Context) {
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { }
     private var audioFocusRequest: AudioFocusRequest? = null
 
-    fun preferBluetooth() {
+    fun preferBestVoiceRoute() {
         requestVoiceAudioFocus()
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = false
         audioManager.isMicrophoneMute = false
 
-        if (!hasBluetoothPermission()) return
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val bluetoothDevice = audioManager.availableCommunicationDevices.firstOrNull {
-                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                    it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
-            }
-            if (bluetoothDevice != null) {
-                audioManager.setCommunicationDevice(bluetoothDevice)
-            }
+            selectModernVoiceDevice()?.let(audioManager::setCommunicationDevice)
         } else {
-            @Suppress("DEPRECATION")
-            audioManager.startBluetoothSco()
-            @Suppress("DEPRECATION")
-            audioManager.isBluetoothScoOn = true
+            routeLegacyVoiceAudio()
         }
     }
 
@@ -49,8 +36,52 @@ class AudioRouteManager(private val context: Context) {
             @Suppress("DEPRECATION")
             audioManager.stopBluetoothSco()
         }
+        @Suppress("DEPRECATION")
+        audioManager.isSpeakerphoneOn = false
         audioManager.mode = AudioManager.MODE_NORMAL
         abandonVoiceAudioFocus()
+    }
+
+    private fun selectModernVoiceDevice(): AudioDeviceInfo? {
+        val devices = audioManager.availableCommunicationDevices
+        val bluetoothDevice = if (hasBluetoothPermission()) {
+            devices.firstOrNull {
+                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                    it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
+            }
+        } else {
+            null
+        }
+
+        return bluetoothDevice ?: devices.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+        } ?: devices.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+        }
+    }
+
+    private fun routeLegacyVoiceAudio() {
+        val hasBluetoothOutput = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+        }
+
+        if (hasBluetoothOutput && hasBluetoothPermission()) {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = false
+            @Suppress("DEPRECATION")
+            audioManager.startBluetoothSco()
+            @Suppress("DEPRECATION")
+            audioManager.isBluetoothScoOn = true
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isBluetoothScoOn = false
+            @Suppress("DEPRECATION")
+            audioManager.stopBluetoothSco()
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = true
+        }
     }
 
     private fun requestVoiceAudioFocus() {
