@@ -12,7 +12,6 @@ RUN npm prune --omit=dev
 FROM node:22-alpine AS runtime
 
 ENV NODE_ENV=production
-ENV PORT=3030
 
 WORKDIR /app
 
@@ -20,6 +19,6 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 
-EXPOSE 3030
+EXPOSE 10000
 
 CMD ["node", "dist/main.js"]

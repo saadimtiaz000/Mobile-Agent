@@ -64,3 +64,24 @@ Then rebuild the APK.
 - Use a domain and HTTPS for real mobile testing outside your LAN.
 - If using Nginx or Caddy, proxy public HTTPS traffic to `127.0.0.1:3030`.
 - Open firewall ports `80` and `443` for HTTPS, or `3030` only for temporary direct testing.
+
+## Render Deploy
+
+The repository includes `render.yaml` for Render Blueprints.
+
+1. Push the latest code to GitHub.
+2. Open Render Dashboard.
+3. Choose **New** -> **Blueprint**.
+4. Select `saadimtiaz000/Mobile-Agent`.
+5. Render will read `render.yaml` and create `nora-agent-backend`.
+6. When prompted, enter `OPENAI_API_KEY` privately in Render.
+7. Deploy.
+8. Open:
+
+```text
+https://nora-agent-backend.onrender.com/api/realtime/status
+```
+
+The response should include `"ready":true`.
+
+Render provides the public `onrender.com` URL. Put that URL into `NoraConfig.kt`, rebuild the APK, and then phones outside your LAN can use Nora.

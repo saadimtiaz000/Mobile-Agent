@@ -1,0 +1,30 @@
+services:
+  - type: web
+    runtime: docker
+    name: nora-agent-backend
+    rootDir: backend
+    branch: main
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /api/realtime/status
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_REALTIME_MODEL
+        value: gpt-realtime-2
+      - key: NORA_VOICE
+        value: marin
+      - key: NORA_INPUT_LANGUAGE
+        value: en
+      - key: NORA_TRANSCRIPTION_MODEL
+        value: gpt-4o-transcribe
+      - key: NORA_NOISE_REDUCTION
+        value: near_field
+      - key: NORA_VAD_THRESHOLD
+        value: "0.68"
+      - key: NORA_VAD_PREFIX_MS
+        value: "420"
+      - key: NORA_VAD_SILENCE_MS
+        value: "760"
+      - key: CORS_ORIGIN
+        value: "*"
